@@ -5,7 +5,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Z3;
 using System.Reflection;
-using AgileObjects.ReadableExpressions;
 
 namespace Zzzap
 {
