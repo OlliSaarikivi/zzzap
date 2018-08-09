@@ -7,7 +7,7 @@ namespace Zzzap
         static void Main(string[] args)
         {
             //BasicBenchmarks.ParallelizeMax();
-            //Sosp15Benchmarks.ParallelizeG1();
+            Sosp15Benchmarks.ParallelizeG1();
             //Sosp15Benchmarks.ParallelizeG2();
             //Sosp15Benchmarks.ParallelizeG3();
             //Sosp15Benchmarks.ParallelizeG4();

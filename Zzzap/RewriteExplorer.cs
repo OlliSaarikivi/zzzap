@@ -16,15 +16,17 @@ namespace Zzzap
             var strategy = TreeToExpr(ctx, tree, matchState);
             Eval eval = (assumption, query) =>
             {
-                try
+                using (solver.CreateFrame())
                 {
-                    solver.Push();
                     solver.Assert(assumption);
                     return solver.Check() == Status.SATISFIABLE &&
                         solver.CheckTerm(!query) == Status.UNSATISFIABLE;
                 }
-                finally { solver.Pop(); }
             };
+            Assert assert = condition =>
+            {
+                Debug.Assert(solver.CheckTerm)
+            }
             var simplifiedStrategy = Rewriters.DefaultRewrite(ctx, uda, eval, strategy);
 
             return simplifiedStrategy;

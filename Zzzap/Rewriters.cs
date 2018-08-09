@@ -1,46 +1,50 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using Microsoft.Z3;
 
 namespace Zzzap
 {
     delegate bool Eval(BoolExpr assumption, BoolExpr query);
-    delegate Expr Rewrite(Context ctx, Aggregation uda, Eval eval, Expr term);
+    delegate void Assert(BoolExpr condition);
+    delegate Expr Rewrite(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr term);
 
     static class Rewriters
     {
         public static Rewrite DefaultRewrite =>
             Fix(AndThen(Z3Simplify, Project, BoolConstants, ITEs, ITEDistributivity, GroupCommutative, LowerDTEquals));
 
-        static Rewrite Fix(Rewrite rewrite) => (ctx, uda, eval, term) =>
+        static Rewrite Fix(Rewrite rewrite) => (ctx, uda, eval, assert, term) =>
         {
             Expr oldTerm;
             do
             {
                 oldTerm = term;
-                term = rewrite(ctx, uda, eval, term);
+                term = rewrite(ctx, uda, eval, assert, term);
             } while (term != oldTerm);
             return term;
         };
 
-        static Rewrite AndThen(params Rewrite[] rewrite) => (ctx, uda, eval, term) =>
+        static Rewrite AndThen(params Rewrite[] rewrite) => (ctx, uda, eval, assert, term) =>
         {
             foreach (var rule in rewrite)
             {
-                term = rule(ctx, uda, eval, term);
+                term = rule(ctx, uda, eval, assert, term);
             }
             return term;
         };
 
-        static Expr Z3Simplify(Context ctx, Aggregation uda, Eval eval, Expr root) => root.ZzzappSimplify(ctx);
+        static Expr Z3Simplify(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => root.ZzzappSimplify(ctx);
 
         delegate Expr Rule(BoolExpr path, Expr term);
-        static Expr TopDownWith(Context ctx, Expr term, Rule rule) => TopDownRewrite(ctx, ctx.MkTrue(), term, rule);
+        static Expr TopDownWith(Context ctx, Assert assert, Expr term, Rule rule) => TopDownRewrite(ctx, assert, ctx.MkTrue(), term, rule);
 
-        static Expr TopDownRewrite(Context ctx, BoolExpr path, Expr term, Rule rule)
+        static Expr TopDownRewrite(Context ctx, Assert assert, BoolExpr path, Expr term, Rule rule)
         {
+            var oldTerm = term;
             term = rule(path, term);
+            assert(ctx.MkImplies(path, ctx.MkEq(oldTerm, term)));
             if (term.IsApp)
             {
                 var decl = term.FuncDecl;
@@ -48,12 +52,12 @@ namespace Zzzap
                 {
                     case Z3_decl_kind.Z3_OP_ITE:
                         var condition = (BoolExpr)term.Args[0];
-                        Expr ifTrue = TopDownRewrite(ctx, path & condition, term.Args[1], rule);
-                        Expr ifFalse = TopDownRewrite(ctx, path & !condition, term.Args[2], rule);
+                        Expr ifTrue = TopDownRewrite(ctx, assert, path & condition, term.Args[1], rule);
+                        Expr ifFalse = TopDownRewrite(ctx, assert, path & !condition, term.Args[2], rule);
                         term = ctx.MkITE(condition, ifTrue, ifFalse);
                         break;
                     default:
-                        term = ctx.MkApp(decl, term.Args.Select(x => TopDownRewrite(ctx, path, x, rule)).ToArray());
+                        term = ctx.MkApp(decl, term.Args.Select(x => TopDownRewrite(ctx, assert, path, x, rule)).ToArray());
                         break;
                 }
             }
@@ -63,7 +67,7 @@ namespace Zzzap
         static bool AreEquivalentUnder(Context ctx, Eval eval, BoolExpr assumption, Expr left, Expr right) =>
             left.Equals(right) || eval(assumption, ctx.MkEq(left, right));
 
-        static Expr ITEs(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr ITEs(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsITE)
             {
@@ -84,7 +88,7 @@ namespace Zzzap
             return term;
         });
 
-        static Expr ITEDistributivity(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr ITEDistributivity(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsApp && term.NumArgs == 1)
             {
@@ -98,7 +102,7 @@ namespace Zzzap
             return term;
         });
 
-        static Expr BoolConstants(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr BoolConstants(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term is BoolExpr boolTerm && term.Contains(uda.State))
             {
@@ -112,7 +116,7 @@ namespace Zzzap
             return term;
         });
 
-        static Expr Project(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr Project(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsApp &&
                 term.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_DT_ACCESSOR &&
@@ -141,7 +145,7 @@ namespace Zzzap
             return term;
         });
 
-        static Expr LowerDTEquals(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr LowerDTEquals(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsEq)
             {
@@ -155,7 +159,7 @@ namespace Zzzap
             return term;
         });
 
-        public static Expr GroupCommutative(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        public static Expr GroupCommutative(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsApp && term.Contains(uda.State))
             {
@@ -189,7 +193,7 @@ namespace Zzzap
         private static Func<IEnumerable<Expr>, IEnumerable<Expr>, Expr> AdaptToExpr<T>(Func<IEnumerable<T>, T> f)
             where T : Expr => (n, g) => f(n.Cast<T>().Concat(new T[] { f(g.Cast<T>()) }));
 
-        static Expr Constants(Context ctx, Aggregation uda, Eval eval, Expr root) => TopDownWith(ctx, root, (path, term) =>
+        static Expr Constants(Context ctx, Aggregation uda, Eval eval, Assert assert, Expr root) => TopDownWith(ctx, assert, root, (path, term) =>
         {
             if (term.IsApp && term.NumArgs > 0)
             {

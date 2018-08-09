@@ -1,4 +1,5 @@
 using Microsoft.Z3;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -61,6 +62,27 @@ namespace Zzzap
             {
                 return 1;
             }
+        }
+
+        class SolverFrame : IDisposable
+        {
+            Solver solver;
+
+            public SolverFrame(Solver solver)
+            {
+                this.solver = solver;
+            }
+
+            public void Dispose()
+            {
+                solver.Pop();
+            }
+        }
+
+        public static IDisposable CreateFrame(this Solver solver)
+        {
+            solver.Push();
+            return new SolverFrame(solver);
         }
     }
 }
