@@ -132,19 +132,19 @@ namespace Zzzap
                 case ExpressionType.Equal: return ctx.MkEq(left, right);
                 case ExpressionType.NotEqual: return ctx.MkNot(ctx.MkEq(left, right));
                 case ExpressionType.AndAlso:
-                case ExpressionType.And: return MakeIfIs<BoolExpr>(ctx.MkAnd, left, right);
+                case ExpressionType.And: return MakeIfIsA<BoolExpr>(ctx.MkAnd, left, right);
                 case ExpressionType.OrElse:
-                case ExpressionType.Or: return MakeIfIs<BoolExpr>(ctx.MkOr, left, right);
-                case ExpressionType.ExclusiveOr: return MakeIfIs<BoolExpr>(ctx.MkXor, left, right);
-                case ExpressionType.GreaterThan: return MakeIfIs<ArithExpr>(ctx.MkGt, left, right);
-                case ExpressionType.LessThan: return MakeIfIs<ArithExpr>(ctx.MkLt, left, right);
-                case ExpressionType.GreaterThanOrEqual: return MakeIfIs<ArithExpr>(ctx.MkGe, left, right);
-                case ExpressionType.LessThanOrEqual: return MakeIfIs<ArithExpr>(ctx.MkLe, left, right);
-                case ExpressionType.Add: return MakeIfIs<ArithExpr>(ctx.MkAdd, left, right);
-                case ExpressionType.Subtract: return MakeIfIs<ArithExpr>(ctx.MkSub, left, right);
-                case ExpressionType.Multiply: return MakeIfIs<ArithExpr>(ctx.MkMul, left, right);
-                case ExpressionType.Divide: return MakeIfIs<ArithExpr>(ctx.MkDiv, left, right);
-                case ExpressionType.Modulo: return MakeIfIs<IntExpr>(ctx.MkMod, left, right);
+                case ExpressionType.Or: return MakeIfIsA<BoolExpr>(ctx.MkOr, left, right);
+                case ExpressionType.ExclusiveOr: return MakeIfIs2<BoolExpr>(ctx.MkXor, left, right);
+                case ExpressionType.GreaterThan: return MakeIfIs2<ArithExpr>(ctx.MkGt, left, right);
+                case ExpressionType.LessThan: return MakeIfIs2<ArithExpr>(ctx.MkLt, left, right);
+                case ExpressionType.GreaterThanOrEqual: return MakeIfIs2<ArithExpr>(ctx.MkGe, left, right);
+                case ExpressionType.LessThanOrEqual: return MakeIfIs2<ArithExpr>(ctx.MkLe, left, right);
+                case ExpressionType.Add: return MakeIfIsA<ArithExpr>(ctx.MkAdd, left, right);
+                case ExpressionType.Subtract: return MakeIfIsA<ArithExpr>(ctx.MkSub, left, right);
+                case ExpressionType.Multiply: return MakeIfIsA<ArithExpr>(ctx.MkMul, left, right);
+                case ExpressionType.Divide: return MakeIfIs2<ArithExpr>(ctx.MkDiv, left, right);
+                case ExpressionType.Modulo: return MakeIfIs2<IntExpr>(ctx.MkMod, left, right);
             }
             return null;
         }
@@ -153,26 +153,26 @@ namespace Zzzap
         {
             switch (type)
             {
-                case ExpressionType.Not: return MakeIfIs<BoolExpr>(ctx.MkNot, arg);
-                case ExpressionType.Negate: return MakeIfIs<ArithExpr>(ctx.MkUnaryMinus, arg);
+                case ExpressionType.Not: return MakeIfIs1<BoolExpr>(ctx.MkNot, arg);
+                case ExpressionType.Negate: return MakeIfIs1<ArithExpr>(ctx.MkUnaryMinus, arg);
                 case ExpressionType.UnaryPlus: return arg;
             }
             return null;
         }
 
-        private static Expr MakeIfIs<T>(Func<T[], Expr> mk, params Expr[] args) where T : Expr
+        private static Expr MakeIfIsA<T>(Func<T[], Expr> mk, params Expr[] args) where T : Expr
         {
             if (args.All(x => x is T)) return mk(args.Cast<T>().ToArray());
             else return null;
         }
 
-        private static Expr MakeIfIs<T>(Func<T, Expr> mk, Expr arg) where T : Expr
+        private static Expr MakeIfIs1<T>(Func<T, Expr> mk, Expr arg) where T : Expr
         {
             if (arg is T a) return mk(a);
             else return null;
         }
 
-        private static Expr MakeIfIs<T>(Func<T, T, Expr> mk, Expr left, Expr right) where T : Expr
+        private static Expr MakeIfIs2<T>(Func<T, T, Expr> mk, Expr left, Expr right) where T : Expr
         {
             if (left is T l && right is T r) return mk(l, r);
             else return null;

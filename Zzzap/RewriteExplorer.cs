@@ -11,8 +11,12 @@ namespace Zzzap
         {
             //var solver = ctx.MkSimpleSolver();
             var solver = ctx.TryFor(ctx.MkTactic("default"), 1000).Solver;
+            Assert assert = condition =>
+            {
+                Debug.Assert(solver.CheckTerm(ctx.MkNot(condition)) == Status.UNSATISFIABLE);
+            };
 
-            var tree = Explore(ctx, solver, uda, comp, Rewriters.DefaultRewrite, matchState);
+            var tree = Explore(ctx, solver, assert, uda, comp, Rewriters.DefaultRewrite, matchState);
             var strategy = TreeToExpr(ctx, tree, matchState);
             Eval eval = (assumption, query) =>
             {
@@ -23,11 +27,7 @@ namespace Zzzap
                         solver.CheckTerm(!query) == Status.UNSATISFIABLE;
                 }
             };
-            Assert assert = condition =>
-            {
-                Debug.Assert(solver.CheckTerm)
-            }
-            var simplifiedStrategy = Rewriters.DefaultRewrite(ctx, uda, eval, strategy);
+            var simplifiedStrategy = Rewriters.DefaultRewrite(ctx, uda, eval, assert, strategy);
 
             return simplifiedStrategy;
         }
@@ -47,7 +47,7 @@ namespace Zzzap
             }
         }
 
-        static NodeHead Explore(Context ctx, Solver solver, Aggregation uda, Expr comp, Rewrite rewrite, Func<Expr, Expr> matchState)
+        static NodeHead Explore(Context ctx, Solver solver, Assert assert, Aggregation uda, Expr comp, Rewrite rewrite, Func<Expr, Expr> matchState)
         {
             var root = new NodeHead(null);
             var current = root;
@@ -135,7 +135,7 @@ namespace Zzzap
 
             while (!root.Finished)
             {
-                var result = rewrite(ctx, uda, eval, comp);
+                var result = rewrite(ctx, uda, eval, assert, comp);
                 current.Tail = new Return(result);
                 matchState(result);
                 MarkFinished(current);
